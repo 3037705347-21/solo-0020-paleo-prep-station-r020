@@ -27,6 +27,12 @@ func (s *Service) LogProgress(
 		if !ok {
 			return notFoundSpecimen(plan.SpecimenID)
 		}
+		if request.PlanRevision < 0 {
+			return contracts.Invalid("invalid_plan_revision", "方案版本必须大于零")
+		}
+		if request.PlanRevision != 0 && request.PlanRevision != plan.CurrentRevision {
+			return contracts.Conflict("stale_plan_revision", "方案条件版本已变化，请依据当前有效版本记录进度")
+		}
 		previous := m.ProgressForPlan(planID)
 		entry, err := domain.NewProgressEntry(
 			s.nextID("progress"),

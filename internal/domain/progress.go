@@ -8,14 +8,16 @@ import (
 )
 
 type ProgressEntry struct {
-	ID         string    `json:"id"`
-	PlanID     string    `json:"plan_id"`
-	Sequence   int       `json:"sequence"`
-	Stage      string    `json:"stage"`
-	Percent    int       `json:"percent"`
-	Note       string    `json:"note"`
-	RecordedBy string    `json:"recorded_by"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         string `json:"id"`
+	PlanID     string `json:"plan_id"`
+	Sequence   int    `json:"sequence"`
+	Stage      string `json:"stage"`
+	Percent    int    `json:"percent"`
+	Note       string `json:"note"`
+	RecordedBy string `json:"recorded_by"`
+	// PlanRevision 固定该条记录依据的方案条件版本。
+	PlanRevision int       `json:"plan_revision"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func NewProgressEntry(
@@ -53,14 +55,15 @@ func NewProgressEntry(
 		return ProgressEntry{}, contracts.Conflict("progress_regressed", "新的进度比例不能低于上一条记录")
 	}
 	return ProgressEntry{
-		ID:         id,
-		PlanID:     plan.ID,
-		Sequence:   len(previous) + 1,
-		Stage:      stageValue,
-		Percent:    percent,
-		Note:       noteValue,
-		RecordedBy: recorder,
-		CreatedAt:  now.UTC(),
+		ID:           id,
+		PlanID:       plan.ID,
+		Sequence:     len(previous) + 1,
+		Stage:        stageValue,
+		Percent:      percent,
+		Note:         noteValue,
+		RecordedBy:   recorder,
+		PlanRevision: plan.CurrentRevision,
+		CreatedAt:    now.UTC(),
 	}, nil
 }
 

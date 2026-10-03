@@ -17,18 +17,19 @@ const (
 )
 
 type PrepPlan struct {
-	ID             string     `json:"id"`
-	SpecimenID     string     `json:"specimen_id"`
-	Objective      string     `json:"objective"`
-	Method         string     `json:"method"`
-	Adhesive       string     `json:"adhesive"`
-	TargetExposure int        `json:"target_exposure"`
-	Status         PlanStatus `json:"status"`
-	ApprovedBy     string     `json:"approved_by,omitempty"`
-	ApprovedAt     *time.Time `json:"approved_at,omitempty"`
-	Version        int        `json:"version"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID              string     `json:"id"`
+	SpecimenID      string     `json:"specimen_id"`
+	Objective       string     `json:"objective"`
+	Method          string     `json:"method"`
+	Adhesive        string     `json:"adhesive"`
+	TargetExposure  int        `json:"target_exposure"`
+	CurrentRevision int        `json:"current_revision"`
+	Status          PlanStatus `json:"status"`
+	ApprovedBy      string     `json:"approved_by,omitempty"`
+	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
+	Version         int        `json:"version"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 func NewPrepPlan(
@@ -65,16 +66,17 @@ func NewPrepPlan(
 		return PrepPlan{}, contracts.Invalid("invalid_target_exposure", "目标暴露比例必须大于零")
 	}
 	return PrepPlan{
-		ID:             id,
-		SpecimenID:     specimen.ID,
-		Objective:      goal,
-		Method:         approach,
-		Adhesive:       adhesiveValue,
-		TargetExposure: targetExposure,
-		Status:         PlanDraft,
-		Version:        1,
-		CreatedAt:      now.UTC(),
-		UpdatedAt:      now.UTC(),
+		ID:              id,
+		SpecimenID:      specimen.ID,
+		Objective:       goal,
+		Method:          approach,
+		Adhesive:        adhesiveValue,
+		TargetExposure:  targetExposure,
+		CurrentRevision: 1,
+		Status:          PlanDraft,
+		Version:         1,
+		CreatedAt:       now.UTC(),
+		UpdatedAt:       now.UTC(),
 	}, nil
 }
 

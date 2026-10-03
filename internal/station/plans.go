@@ -42,6 +42,7 @@ func (s *Service) CreatePlan(
 			return err
 		}
 		m.PutPlan(plan)
+		m.AppendRevision(domain.NewInitialRevision(plan, s.now()))
 		m.PutSpecimen(specimen)
 		created = plan
 		return nil
@@ -92,9 +93,11 @@ func (s *Service) GetPlan(ctx context.Context, planID string) (PlanSnapshot, err
 		if !ok {
 			return notFoundPlan(planID)
 		}
+		progress := m.ProgressForPlan(planID)
 		snapshot = PlanSnapshot{
-			Plan:     plan,
-			Progress: m.ProgressForPlan(planID),
+			Plan:      plan,
+			Revisions: revisionWindows(m.RevisionsForPlan(planID), plan, len(progress)),
+			Progress:  progress,
 		}
 		return nil
 	})

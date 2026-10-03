@@ -10,6 +10,7 @@ import (
 type state struct {
 	specimens map[string]domain.Specimen
 	plans     map[string]domain.PrepPlan
+	revisions map[string][]domain.PlanRevision
 	progress  map[string][]domain.ProgressEntry
 	releases  map[string]domain.ReleaseRecord
 }
@@ -24,6 +25,7 @@ func NewMemory() *MemoryRepository {
 		state: state{
 			specimens: make(map[string]domain.Specimen),
 			plans:     make(map[string]domain.PrepPlan),
+			revisions: make(map[string][]domain.PlanRevision),
 			progress:  make(map[string][]domain.ProgressEntry),
 			releases:  make(map[string]domain.ReleaseRecord),
 		},
@@ -52,6 +54,7 @@ func cloneMutation(source state) *Mutation {
 	copied := state{
 		specimens: make(map[string]domain.Specimen, len(source.specimens)),
 		plans:     make(map[string]domain.PrepPlan, len(source.plans)),
+		revisions: make(map[string][]domain.PlanRevision, len(source.revisions)),
 		progress:  make(map[string][]domain.ProgressEntry, len(source.progress)),
 		releases:  make(map[string]domain.ReleaseRecord, len(source.releases)),
 	}
@@ -60,6 +63,9 @@ func cloneMutation(source state) *Mutation {
 	}
 	for key, value := range source.plans {
 		copied.plans[key] = value
+	}
+	for key, values := range source.revisions {
+		copied.revisions[key] = append([]domain.PlanRevision(nil), values...)
 	}
 	for key, values := range source.progress {
 		copied.progress[key] = append([]domain.ProgressEntry(nil), values...)
@@ -142,6 +148,14 @@ func (m *Mutation) HasOpenPlan(specimenID string) bool {
 		}
 	}
 	return false
+}
+
+func (m *Mutation) RevisionsForPlan(planID string) []domain.PlanRevision {
+	return append([]domain.PlanRevision(nil), m.state.revisions[planID]...)
+}
+
+func (m *Mutation) AppendRevision(value domain.PlanRevision) {
+	m.state.revisions[value.PlanID] = append(m.state.revisions[value.PlanID], value)
 }
 
 func (m *Mutation) ProgressForPlan(planID string) []domain.ProgressEntry {
