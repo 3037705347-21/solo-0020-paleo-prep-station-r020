@@ -26,9 +26,12 @@ type PrepPlan struct {
 	Status         PlanStatus `json:"status"`
 	ApprovedBy     string     `json:"approved_by,omitempty"`
 	ApprovedAt     *time.Time `json:"approved_at,omitempty"`
-	Version        int        `json:"version"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	// CurrentRevision 是当前有效条件的版本号：审批通过前为 0（初始版本尚未
+	// 生效），审批后至少为 1，并随每次现场变更递增。
+	CurrentRevision int       `json:"current_revision"`
+	Version         int       `json:"version"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 func NewPrepPlan(
@@ -98,6 +101,7 @@ func (p *PrepPlan) Approve(approvedBy string, now time.Time) error {
 	p.Status = PlanApproved
 	p.ApprovedBy = approver
 	p.ApprovedAt = &stamp
+	p.CurrentRevision = 1
 	p.Version++
 	p.UpdatedAt = stamp
 	return nil
@@ -111,6 +115,25 @@ func (p *PrepPlan) Begin(now time.Time) error {
 		return contracts.Conflict("plan_not_active", "只有已审批方案可以开始制备")
 	}
 	p.Status = PlanActive
+	p.Version++
+	p.UpdatedAt = now.UTC()
+	return nil
+}
+
+// MarkRevised 在一次现场变更提交后推进当前有效版本号，并把方案快照上的
+// 条件同步为新版本。只有进行中的方案允许变更；完成后调用会得到冲突，
+// 保证"完成后不能再变更"。版本历史本身不受影响。
+func (p *PrepPlan) MarkRevised(next PlanRevision, now time.Time) error {
+	if p.Status != PlanActive {
+		return contracts.Conflict("plan_not_revisable", "只有进行中的活动方案可以提交变更")
+	}
+	if next.Revision != p.CurrentRevision+1 {
+		return contracts.Conflict("revision_out_of_order", "变更版本号必须连续递增")
+	}
+	p.Method = next.Method
+	p.Adhesive = next.Adhesive
+	p.TargetExposure = next.TargetExposure
+	p.CurrentRevision = next.Revision
 	p.Version++
 	p.UpdatedAt = now.UTC()
 	return nil

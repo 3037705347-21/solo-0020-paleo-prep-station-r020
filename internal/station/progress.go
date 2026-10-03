@@ -50,6 +50,19 @@ func (s *Service) LogProgress(
 			if err := plan.Complete(s.now()); err != nil {
 				return err
 			}
+			// 方案完成意味着条件版本的有效范围也随之终止：把当前版本闭合到
+			// 最后一条进度序号，此后不能再追加变更，历史范围全部固定。
+			revisions := m.RevisionsForPlan(planID)
+			current, err := currentRevision(revisions)
+			if err != nil {
+				return err
+			}
+			if err := current.Close(s.now(), entry.Sequence); err != nil {
+				return err
+			}
+			if err := m.SaveRevision(current); err != nil {
+				return err
+			}
 			if err := specimen.MarkStabilized(s.now()); err != nil {
 				return err
 			}

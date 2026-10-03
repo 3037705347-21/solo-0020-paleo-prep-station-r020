@@ -38,10 +38,18 @@ func (s *Service) CreatePlan(
 		if err != nil {
 			return err
 		}
+		// 初始版本随草稿建立但暂不生效，审批通过时才固定有效起点。
+		revision, err := domain.NewBaselineRevision(s.nextID("revision"), plan, s.now())
+		if err != nil {
+			return err
+		}
 		if err := specimen.MarkPlanned(s.now()); err != nil {
 			return err
 		}
 		m.PutPlan(plan)
+		if err := m.AppendRevision(revision); err != nil {
+			return err
+		}
 		m.PutSpecimen(specimen)
 		created = plan
 		return nil
@@ -68,13 +76,23 @@ func (s *Service) ApprovePlan(
 		if !ok {
 			return notFoundSpecimen(plan.SpecimenID)
 		}
+		revisions := m.RevisionsForPlan(planID)
+		if len(revisions) != 1 || revisions[0].Revision != 1 {
+			return contracts.Internal("revision_history_invalid", "方案初始版本缺失或不唯一", nil)
+		}
 		if err := plan.Approve(request.ApprovedBy, s.now()); err != nil {
+			return err
+		}
+		if err := revisions[0].Activate(s.now()); err != nil {
 			return err
 		}
 		if err := specimen.MarkPreparing(s.now()); err != nil {
 			return err
 		}
 		m.PutPlan(plan)
+		if err := m.SaveRevision(revisions[0]); err != nil {
+			return err
+		}
 		m.PutSpecimen(specimen)
 		approved = plan
 		return nil
@@ -93,8 +111,9 @@ func (s *Service) GetPlan(ctx context.Context, planID string) (PlanSnapshot, err
 			return notFoundPlan(planID)
 		}
 		snapshot = PlanSnapshot{
-			Plan:     plan,
-			Progress: m.ProgressForPlan(planID),
+			Plan:      plan,
+			Progress:  m.ProgressForPlan(planID),
+			Revisions: m.RevisionsForPlan(planID),
 		}
 		return nil
 	})

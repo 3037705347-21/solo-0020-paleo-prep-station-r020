@@ -30,8 +30,13 @@ go run ./cmd/paleo-prep-station --addr 127.0.0.1:18133
 - `POST /specimens/{id}/plans`
 - `GET /plans/{id}`
 - `POST /plans/{id}/approval`
+- `POST /plans/{id}/revisions`
 - `POST /plans/{id}/progress`
 - `POST /specimens/{id}/release`
+
+`GET /plans/{id}` 返回方案快照、全部进度记录和 `revisions` 版本历史：每个版本带有原因、操作人、生效时间区间（`effective_from`/`effective_to`）和适用进度序号区间（`from_sequence`/`to_sequence`），可以直接确认每条进度依据哪一版条件。方案对象上的方法、黏结材料和目标暴露比例始终等于当前有效版本。
+
+只有进行中（`active`）的方案接受 `POST /plans/{id}/revisions`，需要 `reason` 和 `changed_by`；未提交的条件字段沿用当前版本。重复提交相同条件返回 `409 revision_unchanged`，不合法条件（含越界比例）返回 `400`，携带过期 `expected_revision` 的并发提交返回 `409 revision_conflict`；完成后的方案拒绝一切变更。
 
 ## 本地验证
 
@@ -42,6 +47,7 @@ go run ./cmd/workflowcheck --workflow register-specimen
 go run ./cmd/workflowcheck --workflow approve-prep-plan
 go run ./cmd/workflowcheck --workflow log-preparation
 go run ./cmd/workflowcheck --workflow release-for-study
+go run ./cmd/workflowcheck --workflow revise-active-plan
 ```
 
 这些检查会启动临时 HTTP 处理器并调用真实公共路由。

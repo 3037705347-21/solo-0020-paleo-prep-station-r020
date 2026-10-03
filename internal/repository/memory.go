@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 
+	"example.com/paleo-prep-station/internal/contracts"
 	"example.com/paleo-prep-station/internal/domain"
 )
 
@@ -12,6 +13,7 @@ type state struct {
 	plans     map[string]domain.PrepPlan
 	progress  map[string][]domain.ProgressEntry
 	releases  map[string]domain.ReleaseRecord
+	revisions map[string][]domain.PlanRevision
 }
 
 type MemoryRepository struct {
@@ -26,6 +28,7 @@ func NewMemory() *MemoryRepository {
 			plans:     make(map[string]domain.PrepPlan),
 			progress:  make(map[string][]domain.ProgressEntry),
 			releases:  make(map[string]domain.ReleaseRecord),
+			revisions: make(map[string][]domain.PlanRevision),
 		},
 	}
 }
@@ -54,6 +57,7 @@ func cloneMutation(source state) *Mutation {
 		plans:     make(map[string]domain.PrepPlan, len(source.plans)),
 		progress:  make(map[string][]domain.ProgressEntry, len(source.progress)),
 		releases:  make(map[string]domain.ReleaseRecord, len(source.releases)),
+		revisions: make(map[string][]domain.PlanRevision, len(source.revisions)),
 	}
 	for key, value := range source.specimens {
 		copied.specimens[key] = value
@@ -66,6 +70,9 @@ func cloneMutation(source state) *Mutation {
 	}
 	for key, value := range source.releases {
 		copied.releases[key] = value
+	}
+	for key, values := range source.revisions {
+		copied.revisions[key] = append([]domain.PlanRevision(nil), values...)
 	}
 	return &Mutation{state: copied}
 }
@@ -150,6 +157,40 @@ func (m *Mutation) ProgressForPlan(planID string) []domain.ProgressEntry {
 
 func (m *Mutation) AppendProgress(value domain.ProgressEntry) {
 	m.state.progress[value.PlanID] = append(m.state.progress[value.PlanID], value)
+}
+
+// RevisionsForPlan 按版本号升序返回方案的全部条件版本。版本只追加、不改写，
+// 因此升序结果就是该方案的条件演变历史。
+func (m *Mutation) RevisionsForPlan(planID string) []domain.PlanRevision {
+	values := append([]domain.PlanRevision(nil), m.state.revisions[planID]...)
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].Revision < values[j].Revision
+	})
+	return values
+}
+
+// AppendRevision 追加一个新版本。版本号必须严格递增，重复版本号被拒绝，
+// 避免重复提交或并发写入把同一版本写两遍。
+func (m *Mutation) AppendRevision(value domain.PlanRevision) error {
+	for _, existing := range m.state.revisions[value.PlanID] {
+		if existing.Revision == value.Revision {
+			return contracts.Conflict("revision_already_exists", "该方案版本已经存在，不能重复提交")
+		}
+	}
+	m.state.revisions[value.PlanID] = append(m.state.revisions[value.PlanID], value)
+	return nil
+}
+
+// SaveRevision 保存对已有版本的就地更新（仅用于闭合当前版本的有效范围）。
+func (m *Mutation) SaveRevision(value domain.PlanRevision) error {
+	values := m.state.revisions[value.PlanID]
+	for i := range values {
+		if values[i].Revision == value.Revision {
+			values[i] = value
+			return nil
+		}
+	}
+	return contracts.Internal("revision_missing", "待更新的方案版本不存在", nil)
 }
 
 func (m *Mutation) ReleaseForSpecimen(specimenID string) (domain.ReleaseRecord, bool) {

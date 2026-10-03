@@ -8,9 +8,12 @@ import (
 )
 
 type ProgressEntry struct {
-	ID         string    `json:"id"`
-	PlanID     string    `json:"plan_id"`
-	Sequence   int       `json:"sequence"`
+	ID       string `json:"id"`
+	PlanID   string `json:"plan_id"`
+	Sequence int    `json:"sequence"`
+	// Revision 固定该条进度依据的方案条件版本。历史进度一经写入不可改写，
+	// 因此这里保存的版本号也永不回改，用于与版本的有效序号区间相互印证。
+	Revision   int       `json:"revision"`
 	Stage      string    `json:"stage"`
 	Percent    int       `json:"percent"`
 	Note       string    `json:"note"`
@@ -34,6 +37,9 @@ func NewProgressEntry(
 	if plan.Status != PlanApproved && plan.Status != PlanActive {
 		return ProgressEntry{}, contracts.Conflict("plan_not_recordable", "当前方案状态不能追加制备进度")
 	}
+	if plan.CurrentRevision < 1 {
+		return ProgressEntry{}, contracts.Conflict("plan_not_recordable", "方案条件版本尚未生效，不能追加制备进度")
+	}
 	if err := validatePercent(percent); err != nil {
 		return ProgressEntry{}, err
 	}
@@ -56,6 +62,7 @@ func NewProgressEntry(
 		ID:         id,
 		PlanID:     plan.ID,
 		Sequence:   len(previous) + 1,
+		Revision:   plan.CurrentRevision,
 		Stage:      stageValue,
 		Percent:    percent,
 		Note:       noteValue,
